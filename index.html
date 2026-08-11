@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fall Break '26 — Hotel Shortlist</title>
+<style>
+  :root {
+    --bg: #f7f3ec;
+    --card: #fffaf3;
+    --ink: #2b2420;
+    --muted: #7a6f63;
+    --accent: #8a3b2f;
+    --line: #e5dccc;
+    --keep: #3f6b4a;
+    --keep-bg: #e6efe8;
+    --borderline: #a5761f;
+    --borderline-bg: #f6ecd8;
+    --alternate: #4a5d8a;
+    --alternate-bg: #e8ecf6;
+    --cut: #9a3b3b;
+    --cut-bg: #f5e3e1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 32px; }
+  header .kicker {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  h1 { font-size: 42px; margin: 0 0 12px; font-style: italic; }
+  header p { color: var(--muted); font-size: 16px; margin: 0 auto; max-width: 560px; line-height: 1.5; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin: 28px 0 36px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .controls button {
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .controls button:hover { border-color: var(--accent); }
+  .controls button.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .region {
+    margin-bottom: 30px;
+  }
+  .region-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  .region-header h2 {
+    font-size: 22px;
+    margin: 0;
+  }
+  .region-header .airports {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .region-header .airports code {
+    background: var(--line);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .card.hidden { display: none; }
+  .card a {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--accent);
+  }
+  .card a:hover { color: var(--accent); }
+  .badge {
+    align-self: flex-start;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .badge.keep { background: var(--keep-bg); color: var(--keep); }
+  .badge.borderline { background: var(--borderline-bg); color: var(--borderline); }
+  .badge.alternate { background: var(--alternate-bg); color: var(--alternate); }
+  .badge.cut { background: var(--cut-bg); color: var(--cut); }
+
+  .note {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 50px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Fall Break '26 &middot; Sept 18&ndash;24</div>
+    <h1>Out West Shortlist</h1>
+    <p>Luxury &amp; boutique hotels across the six regions we're considering, budgeted around $1,500/night. Filter by status below.</p>
+  </header>
+
+  <div class="controls" id="statusControls">
+    <button data-filter="all" class="active">All</button>
+    <button data-filter="keep">Keep</button>
+    <button data-filter="borderline">Borderline</button>
+    <button data-filter="alternate">Alternate</button>
+    <button data-filter="cut">Cut</button>
+  </div>
+
+  <div id="regions"></div>
+
+  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Last updated manually.</footer>
+</div>
+
+<script>
+const DATA = [
+  {
+    region: "Arizona (Sedona)",
+    airports: ["PHX", "FLG"],
+    hotels: [
+      { name: "L'Auberge de Sedona", url: "https://www.lauberge.com/", status: "keep" },
+      { name: "Enchantment Resort", url: "https://www.enchantmentresort.com/", status: "keep" },
+      { name: "Hotel El Portal", url: "https://www.elportalsedona.com/", status: "keep" },
+      { name: "Mii Amo", url: "https://miiamo.com/", status: "cut", note: "All-inclusive Journey runs ~$2,900–3,250/night for two." }
+    ]
+  },
+  {
+    region: "New Mexico (Santa Fe)",
+    airports: ["ABQ"],
+    hotels: [
+      { name: "Four Seasons Resort Rancho Encantado", url: "https://www.fourseasons.com/santafe/", status: "keep" },
+      { name: "Inn of the Five Graces", url: "https://fivegraces.com/", status: "keep" },
+      { name: "Hotel Saint Francis", url: "https://www.hotelstfrancis.com/", status: "keep" }
+    ]
+  },
+  {
+    region: "Wyoming (Jackson Hole)",
+    airports: ["JAC"],
+    hotels: [
+      { name: "Four Seasons Resort and Residences Jackson Hole", url: "https://www.fourseasons.com/jacksonhole/", status: "borderline", note: "No confirmed Sept rate yet — worth checking directly." },
+      { name: "Hotel Jackson", url: "https://www.hoteljackson.com/", status: "alternate" },
+      { name: "Rusty Parrot Lodge & Spa", url: "https://www.rustyparrot.com/", status: "alternate" },
+      { name: "Caldera House", url: "https://calderahouse.com/", status: "cut", note: "Starts at $2,462+/night." },
+      { name: "Amangani", url: "https://www.aman.com/resorts/amangani", status: "cut", note: "Generally $1,200–3,300+/night." }
+    ]
+  },
+  {
+    region: "Montana (Big Sky / Bozeman)",
+    airports: ["BZN", "MSO"],
+    hotels: [
+      { name: "Sage Lodge", url: "https://sagelodge.com/", status: "keep" },
+      { name: "Lone Mountain Ranch", url: "https://www.lonemountainranch.com/", status: "alternate" },
+      { name: "Kimpton Armory Hotel", url: "https://www.armoryhotelbozeman.com/", status: "alternate" },
+      { name: "One&Only Moonlight Basin", url: "https://www.oneandonlyresorts.com/moonlight-basin", status: "borderline", note: "Shoulder season reportedly under $1,200/night, but base rate quoted at $1,800." },
+      { name: "The Ranch at Rock Creek", url: "https://theranchatrockcreek.com/", status: "cut", note: "All-inclusive $2,100–3,200+/night. Nearest airport is MSO, not BZN." }
+    ]
+  },
+  {
+    region: "Colorado",
+    airports: ["TEX", "MTJ", "ASE"],
+    hotels: [
+      { name: "Madeline Hotel & Residences, Auberge Collection (Telluride)", url: "https://auberge.com/madeline/", status: "keep" },
+      { name: "The Little Nell (Aspen)", url: "https://www.thelittlenell.com/", status: "borderline", note: "Averages ~$969–1,644/night depending on dates." },
+      { name: "Dunton Hot Springs", url: "https://www.duntondestinations.com/hot-springs/", status: "cut", note: "$15k+ for 4 nights." }
+    ]
+  },
+  {
+    region: "Alberta (Banff / Lake Louise)",
+    airports: ["YYC"],
+    hotels: [
+      { name: "Fairmont Banff Springs", url: "https://www.fairmont.com/banff-springs/", status: "keep" },
+      { name: "Fairmont Chateau Lake Louise", url: "https://www.fairmont.com/en/hotels/lake-louise/fairmont-chateau-lake-louise.html", status: "keep" },
+      { name: "Moraine Lake Lodge", url: "https://morainelake.com/", status: "borderline", note: "Starts ~$1,000/night, open through Sep 30." },
+      { name: "Rimrock Banff, Emblems Collection", url: "https://www.rimrockresort.com/", status: "cut", note: "Mid-renovation, relaunching as ultra-luxury in 2026." }
+    ]
+  },
+  {
+    region: "California (Napa / Carmel)",
+    airports: ["SFO", "OAK", "STS", "MRY", "SJC"],
+    hotels: [
+      { name: "Solage, Auberge Resorts Collection (Calistoga)", url: "https://auberge.com/solage/", status: "keep" },
+      { name: "Harvest Inn (St. Helena)", url: "https://www.harvestinn.com/", status: "keep" },
+      { name: "Meadowood Napa Valley (St. Helena)", url: "https://meadowood.com/", status: "borderline", note: "King rooms run $940–1,423/night." },
+      { name: "L'Auberge Carmel, Relais & Châteaux", url: "https://www.laubergecarmel.com/", status: "keep" },
+      { name: "La Playa Hotel (Carmel)", url: "https://www.laplayahotel.com/", status: "keep" }
+    ]
+  }
+];
+
+const regionsEl = document.getElementById('regions');
+
+function render() {
+  regionsEl.innerHTML = '';
+  DATA.forEach(region => {
+    const section = document.createElement('div');
+    section.className = 'region';
+
+    const header = document.createElement('div');
+    header.className = 'region-header';
+    header.innerHTML = `<h2>${region.region}</h2><div class="airports">${region.airports.map(a => `<code>${a}</code>`).join(' ')}</div>`;
+    section.appendChild(header);
+
+    const cards = document.createElement('div');
+    cards.className = 'cards';
+
+    region.hotels.forEach(hotel => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.status = hotel.status;
+      card.innerHTML = `
+        <a href="${hotel.url}" target="_blank" rel="noopener">${hotel.name}</a>
+        <span class="badge ${hotel.status}">${hotel.status}</span>
+        ${hotel.note ? `<div class="note">${hotel.note}</div>` : ''}
+      `;
+      cards.appendChild(card);
+    });
+
+    section.appendChild(cards);
+    regionsEl.appendChild(section);
+  });
+  applyFilter(currentFilter);
+}
+
+let currentFilter = 'all';
+
+function applyFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.card').forEach(card => {
+    card.classList.toggle('hidden', filter !== 'all' && card.dataset.status !== filter);
+  });
+  document.querySelectorAll('.region').forEach(region => {
+    const visible = region.querySelectorAll('.card:not(.hidden)').length > 0;
+    region.style.display = visible ? '' : 'none';
+  });
+}
+
+document.getElementById('statusControls').addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('#statusControls button').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  applyFilter(e.target.dataset.filter);
+});
+
+render();
+</script>
+</body>
+</html>
