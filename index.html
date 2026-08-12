@@ -23,10 +23,6 @@
 
     --keep: #3f6b4a;
     --keep-bg: #e2ead9;
-    --borderline: #a1720f;
-    --borderline-bg: #f4e6c3;
-    --alternate: #0D546B;
-    --alternate-bg: #d9e7ea;
     --cut: #a8382c;
     --cut-bg: #f3ddd7;
   }
@@ -97,7 +93,7 @@
   }
   .controls-block { margin-bottom: 18px; }
   .controls-block.teal-block {
-    background: var(--alternate-bg);
+    background: #d9e7ea;
     border: 1px solid rgba(13,84,107,0.18);
     border-radius: 14px;
     padding: 14px 16px 16px;
@@ -208,21 +204,8 @@
   .card a.hotel-link:hover { color: var(--teal); border-bottom-color: var(--teal); }
 
   .badge-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .badge {
-    font-family: 'Inter', sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-weight: 700;
-  }
-  .badge.keep { background: var(--keep-bg); color: var(--keep); }
-  .badge.borderline { background: var(--borderline-bg); color: var(--borderline); }
-  .badge.alternate { background: var(--alternate-bg); color: var(--alternate); }
-  .badge.cut { background: var(--cut-bg); color: var(--cut); }
 
-  .research-toggle {
+  .pill-toggle {
     font-family: 'Inter', sans-serif;
     font-size: 11px;
     font-weight: 700;
@@ -239,7 +222,17 @@
     gap: 4px;
     transition: all 0.15s ease;
   }
-  .research-toggle:hover { border-color: var(--teal); }
+  .status-toggle[data-status="keep"] {
+    background: var(--keep-bg);
+    border-color: var(--keep);
+    color: var(--keep);
+  }
+  .status-toggle[data-status="cut"] {
+    background: var(--cut-bg);
+    border-color: var(--cut);
+    color: var(--cut);
+  }
+  .research-toggle:hover, .status-toggle:hover { border-color: var(--teal); }
   .research-toggle[data-on="true"] {
     background: var(--teal);
     border-color: var(--teal);
@@ -274,7 +267,7 @@
   }
   .budget-input:focus { outline: none; border-color: var(--teal); }
   .budget-input.b-low { border-color: var(--keep); color: var(--keep); }
-  .budget-input.b-mid { border-color: var(--borderline); color: var(--borderline); }
+  .budget-input.b-mid { border-color: var(--gold); color: var(--gold); }
   .budget-input.b-high { border-color: var(--cut); color: var(--cut); }
 
   .est-total {
@@ -282,7 +275,7 @@
     font-size: 13px;
     font-weight: 700;
     color: var(--teal);
-    background: var(--alternate-bg);
+    background: #d9e7ea;
     border-radius: 6px;
     padding: 6px 10px;
     display: flex;
@@ -320,7 +313,7 @@
     <div class="kicker">Fall Break '26 &middot; Sept 18&ndash;24</div>
     <h1>Out West Shortlist</h1>
     <div class="rule"></div>
-    <p>Luxury &amp; boutique hotels across the six regions we're considering, budgeted around $1,500/night. Mark what's been researched and drop in nightly rates, flights, and transfer/rental costs as you find them &mdash; estimated totals assume 4 nights.</p>
+    <p>Luxury &amp; boutique hotels across the regions we're considering, budgeted around $1,500/night. Toggle keep/cut and researched status, and drop in nightly rates, flights, and transfer/rental costs &mdash; estimated totals assume 4 nights.</p>
   </header>
 
   <div class="controls-block">
@@ -328,8 +321,6 @@
     <div class="controls-group" id="statusControls">
       <button class="filter-btn active" data-filter="all">All</button>
       <button class="filter-btn" data-filter="keep">Keep</button>
-      <button class="filter-btn" data-filter="borderline">Borderline</button>
-      <button class="filter-btn" data-filter="alternate">Alternate</button>
       <button class="filter-btn" data-filter="cut">Cut</button>
     </div>
   </div>
@@ -346,7 +337,7 @@
 
   <div id="regions"></div>
 
-  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Estimated totals assume 4 nights of hotel plus flight and transfer/rental costs. <strong>Researched</strong> status and all cost fields are saved in this browser as you edit them.</footer>
+  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Estimated totals assume 4 nights of hotel plus flight and transfer/rental costs. <strong>Keep/cut</strong>, <strong>researched</strong> status, and all cost fields are saved in this browser as you edit them.</footer>
 </div>
 
 <script>
@@ -355,85 +346,57 @@ const DATA = [
     region: "Arizona (Sedona)",
     airports: ["PHX", "FLG"],
     hotels: [
-      { name: "L'Auberge de Sedona", url: "https://www.lauberge.com/", status: "keep", researched: false },
-      { name: "Enchantment Resort", url: "https://www.enchantmentresort.com/", status: "keep", researched: false },
-      { name: "Hotel El Portal", url: "https://www.elportalsedona.com/", status: "keep", researched: false },
-      { name: "Mii Amo", url: "https://miiamo.com/", status: "cut", researched: true, estimate: 1500, note: "All-inclusive Journey runs ~$2,900–3,250/night for two." }
+      { name: "L'Auberge de Sedona", url: "https://www.lauberge.com/", status: "keep", researched: true, estimate: 1050, flight: 1590, transfer: 400 },
+      { name: "Enchantment Resort", url: "https://www.enchantmentresort.com/", status: "keep", researched: true, estimate: 1090, flight: 1590, transfer: 400 },
+      { name: "Hotel El Portal", url: "https://www.elportalsedona.com/", status: "keep", researched: true, estimate: null, flight: 1590, transfer: 400 },
+      { name: "Mii Amo", url: "https://miiamo.com/", status: "cut", researched: true, estimate: 1500, flight: 1590, transfer: 400, note: "All-inclusive Journey runs ~$2,900–3,250/night for two." }
     ]
   },
   {
     region: "New Mexico (Santa Fe)",
     airports: ["ABQ"],
     hotels: [
-      { name: "Four Seasons Resort Rancho Encantado", url: "https://www.fourseasons.com/santafe/", status: "keep", researched: true, estimate: 868 },
-      { name: "Inn of the Five Graces", url: "https://fivegraces.com/", status: "keep", researched: true, estimate: 1376, flight: 1843.60, transfer: 455.61 },
-      { name: "Hotel Saint Francis", url: "https://www.hotelstfrancis.com/", status: "keep", researched: false }
-    ]
-  },
-  {
-    region: "Wyoming (Jackson Hole)",
-    airports: ["JAC"],
-    hotels: [
-      { name: "Four Seasons Resort and Residences Jackson Hole", url: "https://www.fourseasons.com/jacksonhole/", status: "borderline", researched: false, note: "No confirmed Sept rate yet — worth checking directly." },
-      { name: "Hotel Jackson", url: "https://www.hoteljackson.com/", status: "alternate", researched: false },
-      { name: "Rusty Parrot Lodge & Spa", url: "https://www.rustyparrot.com/", status: "alternate", researched: false },
-      { name: "Caldera House", url: "https://calderahouse.com/", status: "cut", researched: true, estimate: 2462, note: "Starts at $2,462+/night." },
-      { name: "Amangani", url: "https://www.aman.com/resorts/amangani", status: "cut", researched: true, estimate: 1800, note: "Generally $1,200–3,300+/night." }
+      { name: "Four Seasons Resort Rancho Encantado", url: "https://www.fourseasons.com/santafe/", status: "keep", researched: true, estimate: 868, flight: 1850, transfer: 250 },
+      { name: "Inn of the Five Graces", url: "https://fivegraces.com/", status: "keep", researched: true, estimate: 1630, flight: 1850, transfer: 250 },
+      { name: "Hotel Saint Francis", url: "https://www.hotelstfrancis.com/", status: "keep", researched: false, estimate: 500, flight: 1850, transfer: 250 }
     ]
   },
   {
     region: "Montana (Big Sky / Bozeman)",
     airports: ["BZN", "MSO"],
     hotels: [
-      { name: "Sage Lodge", url: "https://sagelodge.com/", status: "keep", researched: false },
-      { name: "Lone Mountain Ranch", url: "https://www.lonemountainranch.com/", status: "alternate", researched: false },
-      { name: "Kimpton Armory Hotel", url: "https://www.armoryhotelbozeman.com/", status: "alternate", researched: false },
-      { name: "One&Only Moonlight Basin", url: "https://www.oneandonlyresorts.com/moonlight-basin", status: "borderline", researched: true, estimate: 1200, note: "Shoulder season reportedly under $1,200/night, but base rate quoted at $1,800." },
-      { name: "The Ranch at Rock Creek", url: "https://theranchatrockcreek.com/", status: "cut", researched: true, estimate: 2100, note: "All-inclusive $2,100–3,200+/night. Nearest airport is MSO, not BZN." }
+      { name: "One&Only Moonlight Basin", url: "https://www.oneandonlyresorts.com/moonlight-basin", status: "keep", researched: true, estimate: 1305, flight: 2200, transfer: 560, note: "Shoulder season reportedly under $1,200/night, but base rate quoted at $1,800." }
     ]
   },
   {
     region: "Colorado",
     airports: ["TEX", "MTJ", "ASE"],
     hotels: [
-      { name: "Madeline Hotel & Residences, Auberge Collection (Telluride)", url: "https://auberge.com/madeline/", status: "keep", researched: false },
-      { name: "The Little Nell (Aspen)", url: "https://www.thelittlenell.com/", status: "borderline", researched: true, estimate: 1200, note: "Averages ~$969–1,644/night depending on dates." },
-      { name: "Dunton Hot Springs", url: "https://www.duntondestinations.com/hot-springs/", status: "cut", researched: true, estimate: 3750, note: "$15k+ for 4 nights." }
-    ]
-  },
-  {
-    region: "Alberta (Banff / Lake Louise)",
-    airports: ["YYC"],
-    hotels: [
-      { name: "Fairmont Banff Springs", url: "https://www.fairmont.com/banff-springs/", status: "keep", researched: false },
-      { name: "Fairmont Chateau Lake Louise", url: "https://www.fairmont.com/en/hotels/lake-louise/fairmont-chateau-lake-louise.html", status: "keep", researched: false },
-      { name: "Moraine Lake Lodge", url: "https://morainelake.com/", status: "borderline", researched: true, estimate: 1000, note: "Starts ~$1,000/night, open through Sep 30." },
-      { name: "Rimrock Banff, Emblems Collection", url: "https://www.rimrockresort.com/", status: "cut", researched: false, note: "Mid-renovation, relaunching as ultra-luxury in 2026." }
+      { name: "Madeline Hotel & Residences, Auberge Collection (Telluride)", url: "https://auberge.com/madeline/", status: "keep", researched: false, estimate: 815, flight: 1970, transfer: null },
+      { name: "The Little Nell (Aspen)", url: "https://www.thelittlenell.com/", status: "keep", researched: true, estimate: 1200, flight: 880, transfer: null, note: "Averages ~$969–1,644/night depending on dates." },
+      { name: "Dunton Hot Springs", url: "https://www.duntondestinations.com/hot-springs/", status: "cut", researched: true, estimate: 3750, flight: null, transfer: null, note: "$15k+ for 4 nights." }
     ]
   },
   {
     region: "Mexico (San Miguel de Allende)",
     airports: ["QRO"],
     hotels: [
-      { name: "Rosewood San Miguel de Allende", url: "https://www.rosewoodhotels.com/en/san-miguel-de-allende", status: "keep", researched: true, estimate: 1039, flight: 1734.02, transfer: null, note: "Deluxe Colonial King, 4 nights, $4,157.50 total incl. taxes/fees. Flight is Delta ATL↔QRO nonstop, 2 pax." },
-      { name: "Casa de Sierra Nevada, A Belmond Hotel", url: "https://www.belmond.com/hotels/north-america/mexico/san-miguel-de-allende/casa-de-sierra-nevada/", status: "keep", researched: true, estimate: 1200, note: "Superior rooms ~$1,112–1,165/night, Deluxe ~$1,291–1,300/night." },
-      { name: "Casa 1810 Centro Hotel Boutique", url: "https://casa1810.com/en/casa-1810-centro/our-hotel/", status: "keep", researched: true, estimate: 376, note: "Half a block from the Jardín, colonial architecture, more budget-friendly than the other two." }
+      { name: "Rosewood San Miguel de Allende", url: "https://www.rosewoodhotels.com/en/san-miguel-de-allende", status: "keep", researched: true, estimate: 950, flight: 1940, transfer: null, note: "Deluxe Colonial King, 4 nights. Flight is Delta ATL↔QRO nonstop, 2 pax." },
+      { name: "Casa de Sierra Nevada, A Belmond Hotel", url: "https://www.belmond.com/hotels/north-america/mexico/san-miguel-de-allende/casa-de-sierra-nevada/", status: "keep", researched: false, estimate: 960, flight: 1940, transfer: null, note: "Superior rooms ~$1,112–1,165/night, Deluxe ~$1,291–1,300/night." }
     ]
   },
   {
     region: "California (Napa / Carmel)",
     airports: ["SFO", "OAK", "STS", "MRY", "SJC"],
     hotels: [
-      { name: "Solage, Auberge Resorts Collection (Calistoga)", url: "https://auberge.com/solage/", status: "keep", researched: true, estimate: 700 },
-      { name: "Harvest Inn (St. Helena)", url: "https://www.harvestinn.com/", status: "keep", researched: true, estimate: 600 },
-      { name: "Meadowood Napa Valley (St. Helena)", url: "https://meadowood.com/", status: "borderline", researched: true, estimate: 1180, note: "King rooms run $940–1,423/night." },
-      { name: "L'Auberge Carmel, Relais & Châteaux", url: "https://www.laubergecarmel.com/", status: "keep", researched: true, estimate: 700 },
-      { name: "La Playa Hotel (Carmel)", url: "https://www.laplayahotel.com/", status: "keep", researched: true, estimate: 900 }
+      { name: "Solage, Auberge Resorts Collection (Calistoga)", url: "https://auberge.com/solage/", status: "keep", researched: true, estimate: 1490, flight: 1525, transfer: 355 },
+      { name: "Harvest Inn (St. Helena)", url: "https://www.harvestinn.com/", status: "keep", researched: true, estimate: 620, flight: 1525, transfer: 355 },
+      { name: "La Playa Hotel (Carmel)", url: "https://www.laplayahotel.com/", status: "keep", researched: false, estimate: 1340, flight: 1525, transfer: 355 }
     ]
   }
 ];
 
-const STORAGE_KEY = 'fb26-hotel-tracker-v1';
+const STORAGE_KEY = 'fb26-hotel-tracker-v2';
 
 function loadState() {
   try {
@@ -451,6 +414,7 @@ const TRIP_NIGHTS = 4;
 function getHotelState(hotel) {
   if (!(hotel.name in trackerState)) {
     trackerState[hotel.name] = {
+      status: hotel.status === 'cut' ? 'cut' : 'keep',
       researched: !!hotel.researched,
       budget: (typeof hotel.estimate === 'number') ? hotel.estimate : null,
       flight: (typeof hotel.flight === 'number') ? hotel.flight : null,
@@ -511,7 +475,7 @@ function render() {
       const hs = getHotelState(hotel);
       const card = document.createElement('div');
       card.className = 'card';
-      card.dataset.status = hotel.status;
+      card.dataset.status = hs.status;
       card.dataset.researched = String(hs.researched);
 
       const total = estTotal(hs);
@@ -519,8 +483,8 @@ function render() {
       card.innerHTML = `
         <a class="hotel-link" href="${hotel.url}" target="_blank" rel="noopener">${hotel.name}</a>
         <div class="badge-row">
-          <span class="badge ${hotel.status}">${hotel.status}</span>
-          <span class="research-toggle" data-on="${hs.researched}">${hs.researched ? '&#10003; Researched' : 'Not researched'}</span>
+          <span class="pill-toggle status-toggle" data-status="${hs.status}">${hs.status === 'keep' ? '&#10003; Keep' : '&#10007; Cut'}</span>
+          <span class="pill-toggle research-toggle" data-on="${hs.researched}">${hs.researched ? '&#10003; Researched' : 'Not researched'}</span>
         </div>
         <div class="cost-grid">
           <div class="cost-field">
@@ -539,6 +503,16 @@ function render() {
         <div class="est-total"><span class="label">Est. total, ${TRIP_NIGHTS} nights</span><span class="total-val">${total !== null ? fmtMoney(total) : '—'}</span></div>
         ${hotel.note ? `<div class="note">${hotel.note}</div>` : ''}
       `;
+
+      const statusToggleEl = card.querySelector('.status-toggle');
+      statusToggleEl.addEventListener('click', () => {
+        hs.status = hs.status === 'keep' ? 'cut' : 'keep';
+        statusToggleEl.dataset.status = hs.status;
+        statusToggleEl.innerHTML = hs.status === 'keep' ? '&#10003; Keep' : '&#10007; Cut';
+        card.dataset.status = hs.status;
+        saveState();
+        applyFilters();
+      });
 
       const toggleEl = card.querySelector('.research-toggle');
       toggleEl.addEventListener('click', () => {
