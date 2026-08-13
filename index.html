@@ -73,6 +73,31 @@
     line-height: 1.6;
   }
 
+  .sync-status {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1.5px solid var(--line);
+    color: var(--muted);
+  }
+  .sync-status .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .sync-status.live { border-color: var(--keep); color: var(--keep); background: var(--keep-bg); }
+  .sync-status.live .dot { background: var(--keep); box-shadow: 0 0 0 3px rgba(63,107,74,0.2); }
+  .sync-status.error { border-color: var(--cut); color: var(--cut); background: var(--cut-bg); }
+  .sync-status.error .dot { background: var(--cut); }
+
   .controls-group {
     display: flex;
     flex-wrap: wrap;
@@ -314,6 +339,7 @@
     <h1>Out West Shortlist</h1>
     <div class="rule"></div>
     <p>Luxury &amp; boutique hotels across the regions we're considering, budgeted around $1,500/night. Toggle keep/cut and researched status, and drop in nightly rates, flights, and transfer/rental costs &mdash; estimated totals assume 4 nights.</p>
+    <div class="sync-status" id="syncStatus"><span class="dot"></span><span id="syncStatusText">Connecting…</span></div>
   </header>
 
   <div class="controls-block">
@@ -337,10 +363,24 @@
 
   <div id="regions"></div>
 
-  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Estimated totals assume 4 nights of hotel plus flight and transfer/rental costs. <strong>Keep/cut</strong>, <strong>researched</strong> status, and all cost fields are saved in this browser as you edit them.</footer>
+  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Estimated totals assume 4 nights of hotel plus flight and transfer/rental costs. <strong>Keep/cut</strong>, <strong>researched</strong> status, and all cost fields sync live between everyone viewing this page.</footer>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, get, update, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// Filled in from your Firebase project settings ("Your apps" > web app config).
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDsdHiuVb2nzDbEEe1uS88aJa_r3-OHuOk",
+  authDomain: "fall-break-2026.firebaseapp.com",
+  databaseURL: "https://fall-break-2026-default-rtdb.firebaseio.com",
+  projectId: "fall-break-2026",
+  storageBucket: "fall-break-2026.firebasestorage.app",
+  messagingSenderId: "395152119148",
+  appId: "1:395152119148:web:f060aeae00ed2aaa854f49"
+};
+
 const DATA = [
   {
     region: "Arizona (Sedona)",
@@ -399,32 +439,70 @@ const DATA = [
   }
 ];
 
-const STORAGE_KEY = 'fb26-hotel-tracker-v3';
-
-function loadState() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch (e) { return {}; }
-}
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trackerState));
-}
-
-let trackerState = loadState();
-
 const TRIP_NIGHTS = 4;
+const LOCAL_STORAGE_KEY = 'fb26-hotel-tracker-v3';
+
+let trackerState = {};
+let db = null;
+let hotelsRef = null;
+let syncMode = 'connecting'; // 'connecting' | 'live' | 'local' | 'error'
+let renderPending = false;
+
+function slugify(name) {
+  return name.replace(/[.#$\[\]/]/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+}
+
+function defaultStateFor(hotel) {
+  return {
+    status: hotel.status === 'cut' ? 'cut' : 'keep',
+    researched: !!hotel.researched,
+    budget: (typeof hotel.estimate === 'number') ? hotel.estimate : null,
+    flight: (typeof hotel.flight === 'number') ? hotel.flight : null,
+    transfer: (typeof hotel.transfer === 'number') ? hotel.transfer : null
+  };
+}
 
 function getHotelState(hotel) {
-  if (!(hotel.name in trackerState)) {
-    trackerState[hotel.name] = {
-      status: hotel.status === 'cut' ? 'cut' : 'keep',
-      researched: !!hotel.researched,
-      budget: (typeof hotel.estimate === 'number') ? hotel.estimate : null,
-      flight: (typeof hotel.flight === 'number') ? hotel.flight : null,
-      transfer: (typeof hotel.transfer === 'number') ? hotel.transfer : null
-    };
+  const key = slugify(hotel.name);
+  if (!(key in trackerState)) {
+    trackerState[key] = defaultStateFor(hotel);
   }
-  return trackerState[hotel.name];
+  return trackerState[key];
+}
+
+function setSyncStatus(mode, text) {
+  syncMode = mode;
+  const el = document.getElementById('syncStatus');
+  el.className = 'sync-status' + (mode === 'live' ? ' live' : mode === 'error' ? ' error' : '');
+  document.getElementById('syncStatusText').textContent = text;
+}
+
+// ---------- local storage fallback ----------
+function loadLocal() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || {}; }
+  catch (e) { return {}; }
+}
+function saveLocal() {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trackerState));
+}
+
+// ---------- persistence (writes to Firebase if live, else localStorage) ----------
+const debounceTimers = {};
+function persistHotel(hotel, { debounce = false } = {}) {
+  const key = slugify(hotel.name);
+  if (syncMode === 'live' && db) {
+    const doWrite = () => set(ref(db, 'hotels/' + key), trackerState[key]).catch(err => {
+      console.error('Firebase write failed', err);
+    });
+    if (debounce) {
+      clearTimeout(debounceTimers[key]);
+      debounceTimers[key] = setTimeout(doWrite, 600);
+    } else {
+      doWrite();
+    }
+  } else {
+    saveLocal();
+  }
 }
 
 function estTotal(hs) {
@@ -448,7 +526,22 @@ function fmtMoney(v) {
   return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
+function isEditingAnInput() {
+  const active = document.activeElement;
+  return !!(active && active.classList && active.classList.contains('budget-input'));
+}
+
+function scheduleRender() {
+  if (isEditingAnInput()) {
+    renderPending = true;
+    return;
+  }
+  render();
+}
+
 function render() {
+  renderPending = false;
+  const focused = document.activeElement;
   regionsEl.innerHTML = '';
   DATA.forEach(region => {
     const section = document.createElement('div');
@@ -513,7 +606,7 @@ function render() {
         statusToggleEl.dataset.status = hs.status;
         statusToggleEl.innerHTML = hs.status === 'keep' ? '&#10003; Keep' : '&#10007; Cut';
         card.dataset.status = hs.status;
-        saveState();
+        persistHotel(hotel);
         applyFilters();
       });
 
@@ -523,7 +616,7 @@ function render() {
         toggleEl.dataset.on = String(hs.researched);
         toggleEl.innerHTML = hs.researched ? '&#10003; Researched' : 'Not researched';
         card.dataset.researched = String(hs.researched);
-        saveState();
+        persistHotel(hotel);
         applyFilters();
       });
 
@@ -538,25 +631,28 @@ function render() {
         const v = budgetEl.value === '' ? null : parseFloat(budgetEl.value);
         hs.budget = (v === null || isNaN(v)) ? null : v;
         budgetEl.className = 'budget-input field-budget ' + budgetClass(hs.budget);
-        saveState();
+        persistHotel(hotel, { debounce: true });
         refreshTotal();
       });
+      budgetEl.addEventListener('blur', () => { if (renderPending) render(); });
 
       const flightEl = card.querySelector('.field-flight');
       flightEl.addEventListener('input', () => {
         const v = flightEl.value === '' ? null : parseFloat(flightEl.value);
         hs.flight = (v === null || isNaN(v)) ? null : v;
-        saveState();
+        persistHotel(hotel, { debounce: true });
         refreshTotal();
       });
+      flightEl.addEventListener('blur', () => { if (renderPending) render(); });
 
       const transferEl = card.querySelector('.field-transfer');
       transferEl.addEventListener('input', () => {
         const v = transferEl.value === '' ? null : parseFloat(transferEl.value);
         hs.transfer = (v === null || isNaN(v)) ? null : v;
-        saveState();
+        persistHotel(hotel, { debounce: true });
         refreshTotal();
       });
+      transferEl.addEventListener('blur', () => { if (renderPending) render(); });
 
       cards.appendChild(card);
     });
@@ -601,7 +697,46 @@ document.getElementById('researchControls').addEventListener('click', e => {
   applyFilters();
 });
 
-render();
+// ---------- bootstrap: try Firebase, fall back to local storage ----------
+async function initLive() {
+  const app = initializeApp(FIREBASE_CONFIG);
+  db = getDatabase(app);
+  hotelsRef = ref(db, 'hotels');
+
+  const snap = await get(hotelsRef);
+  const remote = snap.val() || {};
+
+  const missing = {};
+  DATA.forEach(region => region.hotels.forEach(hotel => {
+    const key = slugify(hotel.name);
+    if (!(key in remote)) missing[key] = defaultStateFor(hotel);
+  }));
+  if (Object.keys(missing).length) {
+    await update(hotelsRef, missing);
+  }
+
+  onValue(hotelsRef, snapshot => {
+    trackerState = snapshot.val() || {};
+    setSyncStatus('live', 'Synced live with Andrea');
+    scheduleRender();
+  });
+}
+
+function initLocalOnly(reason) {
+  trackerState = loadLocal();
+  DATA.forEach(region => region.hotels.forEach(hotel => {
+    const key = slugify(hotel.name);
+    if (!(key in trackerState)) trackerState[key] = defaultStateFor(hotel);
+  }));
+  saveLocal();
+  setSyncStatus('local', reason || 'Local only — not synced');
+  render();
+}
+
+initLive().catch(err => {
+  console.error('Live sync unavailable, falling back to local storage', err);
+  initLocalOnly('Local only — sync unavailable');
+});
 </script>
 </body>
 </html>
