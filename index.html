@@ -877,8 +877,13 @@ function applyFilters() {
     card.classList.toggle('hidden', !(statusOk && researchOk));
   });
   document.querySelectorAll('.region').forEach(region => {
-    const visible = region.querySelectorAll('.card:not(.hidden)').length > 0;
-    region.style.display = visible ? '' : 'none';
+    const totalCards = region.querySelectorAll('.card').length;
+    const visibleCards = region.querySelectorAll('.card:not(.hidden)').length;
+    // Only hide a region when it has hotels but all are filtered out.
+    // A brand-new region with zero hotels yet should stay visible so its
+    // "+ Add a hotel" prompt is reachable.
+    const shouldHide = totalCards > 0 && visibleCards === 0;
+    region.style.display = shouldHide ? 'none' : '';
   });
 }
 
