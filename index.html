@@ -196,6 +196,11 @@
     margin: 0;
     color: var(--ink);
   }
+  .region-header-right {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
   .region-header .airports {
     font-family: 'Inter', sans-serif;
     font-size: 13px;
@@ -210,6 +215,21 @@
     font-family: 'Inter', sans-serif;
     font-size: 12px;
   }
+  .remove-link {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    white-space: nowrap;
+  }
+  .remove-link:hover { color: var(--cut); }
+  .badge-row .remove-link { margin-left: auto; }
 
   .cards {
     display: grid;
@@ -440,7 +460,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, get, update, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase, ref, get, update, set, remove, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 // Filled in from your Firebase project settings ("Your apps" > web app config).
 const FIREBASE_CONFIG = {
@@ -612,6 +632,36 @@ function persistRegion(slug) {
   }
 }
 
+function deleteHotel(slug) {
+  delete hotelsState[slug];
+  if (syncMode === 'live' && db) {
+    remove(ref(db, 'hotels/' + slug)).catch(err => {
+      console.error('Firebase delete failed', err);
+    });
+  } else {
+    saveLocal();
+  }
+}
+
+function deleteRegion(regionSlug) {
+  const hotelSlugsInRegion = Object.entries(hotelsState)
+    .filter(([, h]) => h.regionSlug === regionSlug)
+    .map(([slug]) => slug);
+
+  delete catalogState[regionSlug];
+  hotelSlugsInRegion.forEach(slug => delete hotelsState[slug]);
+
+  if (syncMode === 'live' && db) {
+    const updates = { ['catalog/' + regionSlug]: null };
+    hotelSlugsInRegion.forEach(slug => { updates['hotels/' + slug] = null; });
+    update(ref(db), updates).catch(err => {
+      console.error('Firebase delete failed', err);
+    });
+  } else {
+    saveLocal();
+  }
+}
+
 function estTotal(hs) {
   if (hs.budget === null && hs.flight === null && hs.transfer === null) return null;
   return (hs.budget || 0) * TRIP_NIGHTS + (hs.flight || 0) + (hs.transfer || 0);
@@ -749,7 +799,16 @@ function render() {
 
     const header = document.createElement('div');
     header.className = 'region-header';
-    header.innerHTML = `<h2>${region.name}</h2><div class="airports">${(region.airports || []).map(a => `<code>${a}</code>`).join(' ')}</div>`;
+    header.innerHTML = `<h2>${region.name}</h2><div class="region-header-right"><div class="airports">${(region.airports || []).map(a => `<code>${a}</code>`).join(' ')}</div><button type="button" class="remove-link remove-region">Remove location</button></div>`;
+    header.querySelector('.remove-region').addEventListener('click', () => {
+      const hotelCount = Object.values(hotelsState).filter(h => h.regionSlug === regionSlug).length;
+      const msg = hotelCount > 0
+        ? `Remove "${region.name}" and its ${hotelCount} hotel${hotelCount === 1 ? '' : 's'}? This can't be undone.`
+        : `Remove "${region.name}"?`;
+      if (!confirm(msg)) return;
+      deleteRegion(regionSlug);
+      render();
+    });
     section.appendChild(header);
 
     const cards = document.createElement('div');
@@ -782,6 +841,7 @@ function render() {
         <div class="badge-row">
           <span class="pill-toggle status-toggle" data-status="${hs.status}">${hs.status === 'keep' ? '&#10003; Keep' : '&#10007; Cut'}</span>
           <span class="pill-toggle research-toggle" data-on="${hs.researched}">${hs.researched ? '&#10003; Researched' : 'Not researched'}</span>
+          <button type="button" class="remove-link remove-hotel">Remove</button>
         </div>
         <div class="cost-grid">
           <div class="cost-field">
@@ -819,6 +879,12 @@ function render() {
         card.dataset.researched = String(hs.researched);
         persistHotel(slug);
         applyFilters();
+      });
+
+      card.querySelector('.remove-hotel').addEventListener('click', () => {
+        if (!confirm(`Remove "${hs.name}"?`)) return;
+        deleteHotel(slug);
+        render();
       });
 
       const totalEl = card.querySelector('.total-val');
