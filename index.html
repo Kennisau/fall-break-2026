@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fall Break '26 — Hotel Shortlist</title>
+<meta name="description" content="A shared, live-updating shortlist of luxury &amp; boutique hotels for Fall Break '26, Sept 18–24.">
+
+<!-- Open Graph / social share -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Fall Break '26 — Out West Shortlist">
+<meta property="og:description" content="A shared, live-updating hotel shortlist for our Sept 18–24 trip.">
+<meta property="og:image" content="https://kennisau.github.io/fall-break-2026/og-image.jpg">
+<meta property="og:url" content="https://kennisau.github.io/fall-break-2026/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Fall Break '26 — Out West Shortlist">
+<meta name="twitter:description" content="A shared, live-updating hotel shortlist for our Sept 18–24 trip.">
+<meta name="twitter:image" content="https://kennisau.github.io/fall-break-2026/og-image.jpg">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -322,6 +335,64 @@
     line-height: 1.45;
   }
 
+  /* add hotel / add region */
+  .add-card {
+    background: transparent;
+    border: 1.5px dashed var(--teal-soft);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 64px;
+  }
+  .add-card.open { align-items: stretch; justify-content: flex-start; }
+  button.add-toggle-btn {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--teal);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+  }
+  button.add-toggle-btn:hover { text-decoration: underline; }
+  .add-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .add-form .form-row label {
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 2px;
+  }
+  .add-form input, .add-form textarea {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    border: 1.5px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    width: 100%;
+    color: var(--ink);
+    background: #fff;
+  }
+  .add-form input:focus, .add-form textarea:focus { outline: none; border-color: var(--teal); }
+  .add-form .form-actions { display: flex; gap: 8px; margin-top: 2px; }
+  .add-form .form-actions button {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    border: 1.5px solid var(--teal);
+  }
+  .add-form .btn-save { background: var(--teal); color: #fff; }
+  .add-form .btn-cancel { background: #fff; color: var(--teal); }
+
+  .add-region-block { margin: 10px 0 40px; text-align: center; }
+  .add-region-block .add-card { max-width: 420px; margin: 0 auto; display: block; }
+
   footer {
     text-align: center;
     margin-top: 50px;
@@ -362,8 +433,9 @@
   </div>
 
   <div id="regions"></div>
+  <div class="add-region-block" id="addRegionBlock"></div>
 
-  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Estimated totals assume 4 nights of hotel plus flight and transfer/rental costs. <strong>Keep/cut</strong>, <strong>researched</strong> status, and all cost fields sync live between everyone viewing this page.</footer>
+  <footer>Built for planning purposes &mdash; rates are approximate and shift by season/date. Estimated totals assume 4 nights of hotel plus flight and transfer/rental costs. <strong>Keep/cut</strong>, <strong>researched</strong> status, cost fields, and any hotels or locations you add all sync live between everyone viewing this page.</footer>
 </div>
 
 <script type="module">
@@ -381,7 +453,11 @@ const FIREBASE_CONFIG = {
   appId: "1:395152119148:web:f060aeae00ed2aaa854f49"
 };
 
-const DATA = [
+// One-time seed data — only used the very first time the shared database (or
+// this browser's local storage) is empty. After that, everything lives in
+// Firebase (or localStorage as a fallback), so hotels/regions added through
+// the "+ Add" buttons persist without ever touching this file again.
+const SEED_DATA = [
   {
     region: "Arizona (Sedona)",
     airports: ["PHX", "FLG"],
@@ -440,34 +516,56 @@ const DATA = [
 ];
 
 const TRIP_NIGHTS = 4;
-const LOCAL_STORAGE_KEY = 'fb26-hotel-tracker-v3';
+const LOCAL_STORAGE_KEY = 'fb26-hotel-tracker-v4';
 
-let trackerState = {};
+// catalogState: { [regionSlug]: { name, airports: [...], order } }
+// hotelsState:  { [hotelSlug]: { name, url, note, regionSlug, order, status, researched, budget, flight, transfer } }
+let catalogState = {};
+let hotelsState = {};
 let db = null;
+let catalogRef = null;
 let hotelsRef = null;
 let syncMode = 'connecting'; // 'connecting' | 'live' | 'local' | 'error'
 let renderPending = false;
 
 function slugify(name) {
-  return name.replace(/[.#$\[\]/]/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+  return (name || '').replace(/[.#$\[\]/]/g, '_').replace(/[^a-zA-Z0-9_]/g, '').replace(/^_+/, '') || 'item';
 }
 
-function defaultStateFor(hotel) {
-  return {
-    status: hotel.status === 'cut' ? 'cut' : 'keep',
-    researched: !!hotel.researched,
-    budget: (typeof hotel.estimate === 'number') ? hotel.estimate : null,
-    flight: (typeof hotel.flight === 'number') ? hotel.flight : null,
-    transfer: (typeof hotel.transfer === 'number') ? hotel.transfer : null
-  };
-}
-
-function getHotelState(hotel) {
-  const key = slugify(hotel.name);
-  if (!(key in trackerState)) {
-    trackerState[key] = defaultStateFor(hotel);
+function uniqueSlug(name, existingObj) {
+  const base = slugify(name);
+  let candidate = base;
+  let i = 2;
+  while (candidate in existingObj) {
+    candidate = base + '-' + i;
+    i++;
   }
-  return trackerState[key];
+  return candidate;
+}
+
+function seedFromData() {
+  const catalog = {};
+  const hotels = {};
+  SEED_DATA.forEach((region, ri) => {
+    const rSlug = uniqueSlug(region.region, catalog);
+    catalog[rSlug] = { name: region.region, airports: region.airports || [], order: ri };
+    region.hotels.forEach((hotel, hi) => {
+      const hSlug = uniqueSlug(hotel.name, hotels);
+      hotels[hSlug] = {
+        name: hotel.name,
+        url: hotel.url || '',
+        note: hotel.note || '',
+        regionSlug: rSlug,
+        order: hi,
+        status: hotel.status === 'cut' ? 'cut' : 'keep',
+        researched: !!hotel.researched,
+        budget: (typeof hotel.estimate === 'number') ? hotel.estimate : null,
+        flight: (typeof hotel.flight === 'number') ? hotel.flight : null,
+        transfer: (typeof hotel.transfer === 'number') ? hotel.transfer : null
+      };
+    });
+  });
+  return { catalog, hotels };
 }
 
 function setSyncStatus(mode, text) {
@@ -479,27 +577,36 @@ function setSyncStatus(mode, text) {
 
 // ---------- local storage fallback ----------
 function loadLocal() {
-  try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || {}; }
-  catch (e) { return {}; }
+  try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || null; }
+  catch (e) { return null; }
 }
 function saveLocal() {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trackerState));
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ catalog: catalogState, hotels: hotelsState }));
 }
 
 // ---------- persistence (writes to Firebase if live, else localStorage) ----------
 const debounceTimers = {};
-function persistHotel(hotel, { debounce = false } = {}) {
-  const key = slugify(hotel.name);
+function persistHotel(slug, { debounce = false } = {}) {
   if (syncMode === 'live' && db) {
-    const doWrite = () => set(ref(db, 'hotels/' + key), trackerState[key]).catch(err => {
+    const doWrite = () => set(ref(db, 'hotels/' + slug), hotelsState[slug]).catch(err => {
       console.error('Firebase write failed', err);
     });
     if (debounce) {
-      clearTimeout(debounceTimers[key]);
-      debounceTimers[key] = setTimeout(doWrite, 600);
+      clearTimeout(debounceTimers['h_' + slug]);
+      debounceTimers['h_' + slug] = setTimeout(doWrite, 600);
     } else {
       doWrite();
     }
+  } else {
+    saveLocal();
+  }
+}
+
+function persistRegion(slug) {
+  if (syncMode === 'live' && db) {
+    set(ref(db, 'catalog/' + slug), catalogState[slug]).catch(err => {
+      console.error('Firebase write failed', err);
+    });
   } else {
     saveLocal();
   }
@@ -511,6 +618,7 @@ function estTotal(hs) {
 }
 
 const regionsEl = document.getElementById('regions');
+const addRegionBlockEl = document.getElementById('addRegionBlock');
 let currentStatusFilter = 'all';
 let currentResearchFilter = 'all';
 let sortByPrice = false;
@@ -528,7 +636,7 @@ function fmtMoney(v) {
 
 function isEditingAnInput() {
   const active = document.activeElement;
-  return !!(active && active.classList && active.classList.contains('budget-input'));
+  return !!(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
 }
 
 function scheduleRender() {
@@ -539,36 +647,129 @@ function scheduleRender() {
   render();
 }
 
+function buildAddHotelCard(regionSlug) {
+  const wrap = document.createElement('div');
+  wrap.className = 'add-card';
+  wrap.innerHTML = `<button class="add-toggle-btn" type="button">+ Add a hotel</button>`;
+
+  const openForm = () => {
+    wrap.classList.add('open');
+    wrap.innerHTML = `
+      <div class="add-form">
+        <div class="form-row"><label>Hotel name</label><input type="text" class="new-hotel-name" placeholder="e.g. Amangiri"></div>
+        <div class="form-row"><label>Website URL</label><input type="text" class="new-hotel-url" placeholder="https://..."></div>
+        <div class="form-row"><label>Note (optional)</label><input type="text" class="new-hotel-note" placeholder="Anything worth remembering"></div>
+        <div class="form-actions">
+          <button type="button" class="btn-save">Add hotel</button>
+          <button type="button" class="btn-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    const nameEl = wrap.querySelector('.new-hotel-name');
+    const urlEl = wrap.querySelector('.new-hotel-url');
+    const noteEl = wrap.querySelector('.new-hotel-note');
+    nameEl.focus();
+
+    wrap.querySelector('.btn-cancel').addEventListener('click', () => render());
+
+    wrap.querySelector('.btn-save').addEventListener('click', () => {
+      const name = nameEl.value.trim();
+      if (!name) { nameEl.focus(); return; }
+      const slug = uniqueSlug(name, hotelsState);
+      const order = Object.values(hotelsState).filter(h => h.regionSlug === regionSlug).length;
+      hotelsState[slug] = {
+        name,
+        url: urlEl.value.trim(),
+        note: noteEl.value.trim(),
+        regionSlug,
+        order,
+        status: 'keep',
+        researched: false,
+        budget: null,
+        flight: null,
+        transfer: null
+      };
+      persistHotel(slug);
+      render();
+    });
+  };
+
+  wrap.querySelector('.add-toggle-btn').addEventListener('click', openForm);
+  return wrap;
+}
+
+function buildAddRegionCard() {
+  const wrap = document.createElement('div');
+  wrap.className = 'add-card';
+  wrap.innerHTML = `<button class="add-toggle-btn" type="button">+ Add a new location</button>`;
+
+  const openForm = () => {
+    wrap.classList.add('open');
+    wrap.innerHTML = `
+      <div class="add-form">
+        <div class="form-row"><label>Region / location name</label><input type="text" class="new-region-name" placeholder="e.g. Utah (Amangiri)"></div>
+        <div class="form-row"><label>Nearest airport code(s), comma-separated</label><input type="text" class="new-region-airports" placeholder="e.g. PGA, FLG"></div>
+        <div class="form-actions">
+          <button type="button" class="btn-save">Add location</button>
+          <button type="button" class="btn-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    const nameEl = wrap.querySelector('.new-region-name');
+    const airportsEl = wrap.querySelector('.new-region-airports');
+    nameEl.focus();
+
+    wrap.querySelector('.btn-cancel').addEventListener('click', () => render());
+
+    wrap.querySelector('.btn-save').addEventListener('click', () => {
+      const name = nameEl.value.trim();
+      if (!name) { nameEl.focus(); return; }
+      const slug = uniqueSlug(name, catalogState);
+      const order = Object.keys(catalogState).length;
+      const airports = airportsEl.value.split(',').map(s => s.trim()).filter(Boolean);
+      catalogState[slug] = { name, airports, order };
+      persistRegion(slug);
+      render();
+    });
+  };
+
+  wrap.querySelector('.add-toggle-btn').addEventListener('click', openForm);
+  return wrap;
+}
+
 function render() {
   renderPending = false;
-  const focused = document.activeElement;
   regionsEl.innerHTML = '';
-  DATA.forEach(region => {
+
+  const regionEntries = Object.entries(catalogState).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
+
+  regionEntries.forEach(([regionSlug, region]) => {
     const section = document.createElement('div');
     section.className = 'region';
 
     const header = document.createElement('div');
     header.className = 'region-header';
-    header.innerHTML = `<h2>${region.region}</h2><div class="airports">${region.airports.map(a => `<code>${a}</code>`).join(' ')}</div>`;
+    header.innerHTML = `<h2>${region.name}</h2><div class="airports">${(region.airports || []).map(a => `<code>${a}</code>`).join(' ')}</div>`;
     section.appendChild(header);
 
     const cards = document.createElement('div');
     cards.className = 'cards';
 
-    let hotels = region.hotels.slice();
+    let hotelEntries = Object.entries(hotelsState).filter(([, h]) => h.regionSlug === regionSlug);
     if (sortByPrice) {
-      hotels.sort((a, b) => {
-        const av = estTotal(getHotelState(a));
-        const bv = estTotal(getHotelState(b));
+      hotelEntries.sort((a, b) => {
+        const av = estTotal(a[1]);
+        const bv = estTotal(b[1]);
         if (av === null && bv === null) return 0;
         if (av === null) return 1;
         if (bv === null) return -1;
         return av - bv;
       });
+    } else {
+      hotelEntries.sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
     }
 
-    hotels.forEach(hotel => {
-      const hs = getHotelState(hotel);
+    hotelEntries.forEach(([slug, hs]) => {
       const card = document.createElement('div');
       card.className = 'card';
       card.dataset.status = hs.status;
@@ -577,7 +778,7 @@ function render() {
       const total = estTotal(hs);
 
       card.innerHTML = `
-        <a class="hotel-link" href="${hotel.url}" target="_blank" rel="noopener">${hotel.name}</a>
+        <a class="hotel-link" href="${hs.url || '#'}" target="_blank" rel="noopener">${hs.name}</a>
         <div class="badge-row">
           <span class="pill-toggle status-toggle" data-status="${hs.status}">${hs.status === 'keep' ? '&#10003; Keep' : '&#10007; Cut'}</span>
           <span class="pill-toggle research-toggle" data-on="${hs.researched}">${hs.researched ? '&#10003; Researched' : 'Not researched'}</span>
@@ -597,7 +798,7 @@ function render() {
           </div>
         </div>
         <div class="est-total"><span class="label">Est. total, ${TRIP_NIGHTS} nights</span><span class="total-val">${total !== null ? fmtMoney(total) : '—'}</span></div>
-        ${hotel.note ? `<div class="note">${hotel.note}</div>` : ''}
+        ${hs.note ? `<div class="note">${hs.note}</div>` : ''}
       `;
 
       const statusToggleEl = card.querySelector('.status-toggle');
@@ -606,7 +807,7 @@ function render() {
         statusToggleEl.dataset.status = hs.status;
         statusToggleEl.innerHTML = hs.status === 'keep' ? '&#10003; Keep' : '&#10007; Cut';
         card.dataset.status = hs.status;
-        persistHotel(hotel);
+        persistHotel(slug);
         applyFilters();
       });
 
@@ -616,7 +817,7 @@ function render() {
         toggleEl.dataset.on = String(hs.researched);
         toggleEl.innerHTML = hs.researched ? '&#10003; Researched' : 'Not researched';
         card.dataset.researched = String(hs.researched);
-        persistHotel(hotel);
+        persistHotel(slug);
         applyFilters();
       });
 
@@ -631,7 +832,7 @@ function render() {
         const v = budgetEl.value === '' ? null : parseFloat(budgetEl.value);
         hs.budget = (v === null || isNaN(v)) ? null : v;
         budgetEl.className = 'budget-input field-budget ' + budgetClass(hs.budget);
-        persistHotel(hotel, { debounce: true });
+        persistHotel(slug, { debounce: true });
         refreshTotal();
       });
       budgetEl.addEventListener('blur', () => { if (renderPending) render(); });
@@ -640,7 +841,7 @@ function render() {
       flightEl.addEventListener('input', () => {
         const v = flightEl.value === '' ? null : parseFloat(flightEl.value);
         hs.flight = (v === null || isNaN(v)) ? null : v;
-        persistHotel(hotel, { debounce: true });
+        persistHotel(slug, { debounce: true });
         refreshTotal();
       });
       flightEl.addEventListener('blur', () => { if (renderPending) render(); });
@@ -649,7 +850,7 @@ function render() {
       transferEl.addEventListener('input', () => {
         const v = transferEl.value === '' ? null : parseFloat(transferEl.value);
         hs.transfer = (v === null || isNaN(v)) ? null : v;
-        persistHotel(hotel, { debounce: true });
+        persistHotel(slug, { debounce: true });
         refreshTotal();
       });
       transferEl.addEventListener('blur', () => { if (renderPending) render(); });
@@ -657,9 +858,15 @@ function render() {
       cards.appendChild(card);
     });
 
+    cards.appendChild(buildAddHotelCard(regionSlug));
+
     section.appendChild(cards);
     regionsEl.appendChild(section);
   });
+
+  addRegionBlockEl.innerHTML = '';
+  addRegionBlockEl.appendChild(buildAddRegionCard());
+
   applyFilters();
 }
 
@@ -701,33 +908,37 @@ document.getElementById('researchControls').addEventListener('click', e => {
 async function initLive() {
   const app = initializeApp(FIREBASE_CONFIG);
   db = getDatabase(app);
+  catalogRef = ref(db, 'catalog');
   hotelsRef = ref(db, 'hotels');
 
-  const snap = await get(hotelsRef);
-  const remote = snap.val() || {};
-
-  const missing = {};
-  DATA.forEach(region => region.hotels.forEach(hotel => {
-    const key = slugify(hotel.name);
-    if (!(key in remote)) missing[key] = defaultStateFor(hotel);
-  }));
-  if (Object.keys(missing).length) {
-    await update(hotelsRef, missing);
+  const catalogSnap = await get(catalogRef);
+  if (!catalogSnap.exists()) {
+    const { catalog, hotels } = seedFromData();
+    await update(ref(db), { catalog, hotels });
   }
 
+  onValue(catalogRef, snapshot => {
+    catalogState = snapshot.val() || {};
+    setSyncStatus('live', 'Synced live with Andrea');
+    scheduleRender();
+  });
   onValue(hotelsRef, snapshot => {
-    trackerState = snapshot.val() || {};
+    hotelsState = snapshot.val() || {};
     setSyncStatus('live', 'Synced live with Andrea');
     scheduleRender();
   });
 }
 
 function initLocalOnly(reason) {
-  trackerState = loadLocal();
-  DATA.forEach(region => region.hotels.forEach(hotel => {
-    const key = slugify(hotel.name);
-    if (!(key in trackerState)) trackerState[key] = defaultStateFor(hotel);
-  }));
+  const existing = loadLocal();
+  if (existing && existing.catalog && Object.keys(existing.catalog).length) {
+    catalogState = existing.catalog;
+    hotelsState = existing.hotels || {};
+  } else {
+    const { catalog, hotels } = seedFromData();
+    catalogState = catalog;
+    hotelsState = hotels;
+  }
   saveLocal();
   setSyncStatus('local', reason || 'Local only — not synced');
   render();
