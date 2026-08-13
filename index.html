@@ -348,7 +348,8 @@ const DATA = [
     hotels: [
       { name: "L'Auberge de Sedona", url: "https://www.lauberge.com/", status: "keep", researched: true, estimate: 1050, flight: 1590, transfer: 400 },
       { name: "Enchantment Resort", url: "https://www.enchantmentresort.com/", status: "keep", researched: true, estimate: 1090, flight: 1590, transfer: 400 },
-      { name: "Hotel El Portal", url: "https://www.elportalsedona.com/", status: "keep", researched: true, estimate: null, flight: 1590, transfer: 400 },
+      { name: "Hotel El Portal", url: "https://www.elportalsedona.com/", status: "cut", researched: true, estimate: null, flight: 1590, transfer: 400 },
+      { name: "Ambiente, A Landscape Hotel", url: "https://www.ambientesedona.com/", status: "keep", researched: true, estimate: 1304, flight: 1590, transfer: null, note: "Star Atrium room, Prepay and Save rate, 2 adults, 4 nights. $5,216 room + $725 taxes/fees = $5,941 total." },
       { name: "Mii Amo", url: "https://miiamo.com/", status: "cut", researched: true, estimate: 1500, flight: 1590, transfer: 400, note: "All-inclusive Journey runs ~$2,900–3,250/night for two." }
     ]
   },
@@ -357,8 +358,9 @@ const DATA = [
     airports: ["ABQ"],
     hotels: [
       { name: "Four Seasons Resort Rancho Encantado", url: "https://www.fourseasons.com/santafe/", status: "keep", researched: true, estimate: 868, flight: 1850, transfer: 250 },
-      { name: "Inn of the Five Graces", url: "https://fivegraces.com/", status: "keep", researched: true, estimate: 1630, flight: 1850, transfer: 250 },
-      { name: "Hotel Saint Francis", url: "https://www.hotelstfrancis.com/", status: "keep", researched: false, estimate: 500, flight: 1850, transfer: 250 }
+      { name: "Inn of the Five Graces", url: "https://fivegraces.com/", status: "keep", researched: true, estimate: 1350, flight: 1850, transfer: 250 },
+      { name: "Hotel Saint Francis", url: "https://www.hotelstfrancis.com/", status: "keep", researched: false, estimate: 500, flight: 1850, transfer: 250 },
+      { name: "Rosewood Inn of the Anasazi", url: "https://www.rosewoodhotels.com/en/inn-of-the-anasazi-santa-fe", status: "keep", researched: true, estimate: 950, flight: 1850, transfer: null, note: "Premier King Room, 2 adults, 4 nights, with 'More Rosewood 3rd Night Complimentary' applied. $3,800 room + $815.16 taxes/fees = $4,615.16 total." }
     ]
   },
   {
@@ -374,7 +376,8 @@ const DATA = [
     hotels: [
       { name: "Madeline Hotel & Residences, Auberge Collection (Telluride)", url: "https://auberge.com/madeline/", status: "keep", researched: false, estimate: 815, flight: 1970, transfer: null },
       { name: "The Little Nell (Aspen)", url: "https://www.thelittlenell.com/", status: "keep", researched: true, estimate: 1200, flight: 880, transfer: null, note: "Averages ~$969–1,644/night depending on dates." },
-      { name: "Dunton Hot Springs", url: "https://www.duntondestinations.com/hot-springs/", status: "cut", researched: true, estimate: 3750, flight: null, transfer: null, note: "$15k+ for 4 nights." }
+      { name: "Hotel Jerome, Auberge Collection (Aspen)", url: "https://auberge.com/hotel-jerome/", status: "keep", researched: true, estimate: 1121, flight: 880, transfer: null, note: "Junior Suite Double, 4 nights, quoted for 1 adult only (not 2) — confirm double-occupancy pricing. $4,484 room + $820.90 taxes/fees = $5,304.90 total." },
+      { name: "Dunton Hot Springs", url: "https://www.duntondestinations.com/hot-springs/", status: "cut", researched: true, estimate: 3750, flight: 880, transfer: 450, note: "$15k+ for 4 nights." }
     ]
   },
   {
@@ -396,7 +399,7 @@ const DATA = [
   }
 ];
 
-const STORAGE_KEY = 'fb26-hotel-tracker-v2';
+const STORAGE_KEY = 'fb26-hotel-tracker-v3';
 
 function loadState() {
   try {
