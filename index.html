@@ -190,6 +190,12 @@
     padding-bottom: 8px;
     margin-bottom: 14px;
   }
+  .region-header.editing {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .region-header.editing .add-form { max-width: 420px; }
   .region-header h2 {
     font-size: 23px;
     font-weight: 600;
@@ -230,6 +236,20 @@
   }
   .remove-link:hover { color: var(--cut); }
   .badge-row .remove-link { margin-left: auto; }
+  .edit-link {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    white-space: nowrap;
+  }
+  .edit-link:hover { color: var(--teal); }
 
   .cards {
     display: grid;
@@ -672,6 +692,15 @@ const addRegionBlockEl = document.getElementById('addRegionBlock');
 let currentStatusFilter = 'all';
 let currentResearchFilter = 'all';
 let sortByPrice = false;
+let editingRegionSlug = null;
+
+function escapeAttr(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 function budgetClass(val) {
   if (val === null || val === '' || isNaN(val)) return '';
@@ -798,17 +827,51 @@ function render() {
     section.className = 'region';
 
     const header = document.createElement('div');
-    header.className = 'region-header';
-    header.innerHTML = `<h2>${region.name}</h2><div class="region-header-right"><div class="airports">${(region.airports || []).map(a => `<code>${a}</code>`).join(' ')}</div><button type="button" class="remove-link remove-region">Remove location</button></div>`;
-    header.querySelector('.remove-region').addEventListener('click', () => {
-      const hotelCount = Object.values(hotelsState).filter(h => h.regionSlug === regionSlug).length;
-      const msg = hotelCount > 0
-        ? `Remove "${region.name}" and its ${hotelCount} hotel${hotelCount === 1 ? '' : 's'}? This can't be undone.`
-        : `Remove "${region.name}"?`;
-      if (!confirm(msg)) return;
-      deleteRegion(regionSlug);
-      render();
-    });
+
+    if (editingRegionSlug === regionSlug) {
+      header.className = 'region-header editing';
+      header.innerHTML = `
+        <div class="add-form">
+          <div class="form-row"><label>Region / location name</label><input type="text" class="edit-region-name" value="${escapeAttr(region.name)}"></div>
+          <div class="form-row"><label>Nearest airport code(s), comma-separated</label><input type="text" class="edit-region-airports" value="${escapeAttr((region.airports || []).join(', '))}"></div>
+          <div class="form-actions">
+            <button type="button" class="btn-save">Save</button>
+            <button type="button" class="btn-cancel">Cancel</button>
+          </div>
+        </div>
+      `;
+      const nameEl = header.querySelector('.edit-region-name');
+      const airportsEl = header.querySelector('.edit-region-airports');
+      header.querySelector('.btn-cancel').addEventListener('click', () => {
+        editingRegionSlug = null;
+        render();
+      });
+      header.querySelector('.btn-save').addEventListener('click', () => {
+        const name = nameEl.value.trim();
+        if (!name) { nameEl.focus(); return; }
+        const airports = airportsEl.value.split(',').map(s => s.trim()).filter(Boolean);
+        catalogState[regionSlug] = { ...region, name, airports };
+        persistRegion(regionSlug);
+        editingRegionSlug = null;
+        render();
+      });
+    } else {
+      header.className = 'region-header';
+      header.innerHTML = `<h2>${region.name}</h2><div class="region-header-right"><div class="airports">${(region.airports || []).map(a => `<code>${a}</code>`).join(' ')}</div><button type="button" class="edit-link edit-region">Edit</button><button type="button" class="remove-link remove-region">Remove location</button></div>`;
+      header.querySelector('.edit-region').addEventListener('click', () => {
+        editingRegionSlug = regionSlug;
+        render();
+      });
+      header.querySelector('.remove-region').addEventListener('click', () => {
+        const hotelCount = Object.values(hotelsState).filter(h => h.regionSlug === regionSlug).length;
+        const msg = hotelCount > 0
+          ? `Remove "${region.name}" and its ${hotelCount} hotel${hotelCount === 1 ? '' : 's'}? This can't be undone.`
+          : `Remove "${region.name}"?`;
+        if (!confirm(msg)) return;
+        deleteRegion(regionSlug);
+        render();
+      });
+    }
     section.appendChild(header);
 
     const cards = document.createElement('div');
